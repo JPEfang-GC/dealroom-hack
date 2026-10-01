@@ -43,8 +43,8 @@
   style.textContent = ".mp-bars{padding:8px 4px}.mp-bar{display:grid;grid-template-columns:44px 1fr 70px;gap:8px;align-items:center;font-size:12px;margin:5px 0}.mp-track{background:#eef2f6;border-radius:4px;height:14px;overflow:hidden}.mp-track i{display:block;height:100%}.mp-val{text-align:right;font-weight:600}.mp-up{color:#b3261e;font-weight:700}.mp-down{color:#1a7f4b;font-weight:700}";
   document.head.appendChild(style);
   var firstTab = document.querySelector(".tab"); if (!firstTab) return;
-  var tab = document.createElement("button"); tab.className = firstTab.className.replace("active", "").trim(); tab.dataset.panel = "marketneed"; tab.textContent = "4 · Market need";
-  firstTab.parentNode.appendChild(tab);
+  var tab = document.createElement("button"); tab.className = firstTab.className.replace("active", "").trim(); tab.dataset.panel = "marketneed"; tab.textContent = "1 · Market need";
+  firstTab.parentNode.insertBefore(tab, firstTab.parentNode.firstChild);   // Market need is the first tab
   var panel = document.createElement("section"); panel.className = "panel"; panel.id = "marketneed"; panel.innerHTML = html;
   document.getElementById("prospects").insertAdjacentElement("afterend", panel);
   tab.addEventListener("click", function () {

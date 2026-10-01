@@ -23,7 +23,7 @@
   var head = document.createElement("div"); head.className = "ans-head"; head.innerHTML = "<h2>" + esc(verdict) + "</h2><span>" + esc("for a EUR 100m European Financial Inclusion fund · " + [gap ? (gap.capital_gap_pp > 0 ? "need is rising faster than capital" : "capital is keeping pace with need") : "", shareNow == null ? "" : shareNow < shareThen ? "FI's share of VC is shrinking" : "FI holds its share of VC", overlap === null ? "" : overlap ? "outperformance vs fintech is not shown" : "FI outperforms fintech"].filter(Boolean).join(", ")) + "</span>";
   strip.innerHTML = '<div><small>Market need</small><strong class="' + need[0] + '">Need: ' + esc(need[1]) + '</strong><p>' + esc(need[2]) + '</p></div>' +
     '<div><small>Capital &amp; performance</small><strong class="' + capital[0] + '">' + esc(capital[1]) + '</strong><p>' + esc(capital[2]) + ' ' + esc(perf[1] + ": " + perf[2]) + '</p></div>' +
-    '<div><small>Top LPs to investigate</small><strong>' + lps.map(function (l) { return esc(l.name); }).join(", ") + '</strong><p>Each reaches ' + lps.map(function (l) { return l.fiCompanies; }).join(" / ") + ' FI companies through managers it backs. Click a row on tab 3 for the path.</p></div>';
+    '<div><small>Top LPs to investigate</small><strong>' + lps.map(function (l) { return esc(l.name); }).join(", ") + '</strong><p>Each reaches ' + lps.map(function (l) { return l.fiCompanies; }).join(" / ") + ' FI companies through managers it backs. Click a row on tab 4 for the path.</p></div>';
   var tabs = document.querySelector(".tabs"); if (tabs) { tabs.parentNode.insertBefore(head, tabs); tabs.parentNode.insertBefore(strip, tabs); }
 
   /* vocabulary and leftover prototype wording */
@@ -46,4 +46,7 @@
     det.appendChild(sum); chips.slice(3).forEach(function (c) { det.appendChild(c); }); cell.appendChild(det);
     det.addEventListener("click", function (e) { e.stopPropagation(); });
   });
+
+  /* open on Market need (tab order: Market need, FI vs. peers, Network, LPs) */
+  var first = document.querySelector('.tab[data-panel="marketneed"]'); if (first) first.click();
 })();
