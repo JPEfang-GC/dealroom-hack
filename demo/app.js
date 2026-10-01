@@ -33,10 +33,10 @@
   }
   function cohortStats(group) {
     var companies = byGroup(group);
-    var years = isReal ? (function () { var a = [], y = 2025, m = 4; for (var i = 0; i < 18; i++) { a.push(y + "-" + String(m).padStart(2, "0")); if (++m === 13) { m = 1; y++; } } return a; })() : [2022, 2023, 2024, 2025];
+    var years = data.years ? data.years : isReal ? (function () { var a = [], y = 2025, m = 4; for (var i = 0; i < 18; i++) { a.push(y + "-" + String(m).padStart(2, "0")); if (++m === 13) { m = 1; y++; } } return a; })() : [2022, 2023, 2024, 2025];
     var funding = years.map(function (period) {
       return companies.reduce(function (sum, company) {
-        return sum + company.rounds.filter(function (round) { return isReal ? (round.year + "-" + String(round.month).padStart(2, "0")) === period : round.year === period; })
+        return sum + company.rounds.filter(function (round) { return (isReal && !data.years) ? (round.year + "-" + String(round.month).padStart(2, "0")) === period : round.year === period; })
           .reduce(function (subtotal, round) { return subtotal + (round.amount || 0); }, 0);
       }, 0);
     });
@@ -261,7 +261,7 @@
     document.querySelector(".legend span:nth-last-child(2)").innerHTML = '<i class="dot" style="background:#d18c27"></i>Round investor';
     document.querySelector(".legend span:last-child").innerHTML = '<i class="dot" style="background:#cf5a83"></i>Limited partner';
     document.querySelector("#analysis .card-head .small").textContent = "All reported rounds and comparison metrics use " + data.window + " records; USD amounts.";
-    document.querySelector("#analysis .card-head .tag").textContent = "USD millions · 18 months";
+    document.querySelector("#analysis .card-head .tag").textContent = (data.windowTag || "USD millions · 18 months");
     document.querySelector("#analysis .note").textContent = "Follow-on = companies with 2+ VC rounds in the window; step-up = median latest/prior recorded valuation where both are present; exits = observed Dealroom exit transactions matched to these companies; concentration = top 3 latest recorded valuations / all latest recorded valuations. These are database signals, not realized investor returns.";
     document.querySelector("#prospects .card-head h2").textContent = "LP links to investigate";
     document.querySelector("#prospects .card-head .small").textContent = data.coverage.lpsWithFiCompanyLinks + " LPs have known links to round investors that also appear on FI company rounds; these candidates come from the displayed investor set.";

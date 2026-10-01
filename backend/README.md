@@ -14,7 +14,8 @@ python3 backend/crawl_lps.py        # ~394 institutional EU LPs and the GPs each
 python3 backend/build_fixture.py    # classify sub-themes, LP->GP->company paths, attribution -> data/fixture.real.js
 ```
 Standard library only. Responses are cached in `data/cache/`, so reruns are fast.
-To preview: copy `demo/` somewhere, replace `fixture.js` with `data/fixture.real.js`, run `python3 -m http.server`.
+To preview: `build_macro.py` also writes `demo/real-fixture.local.js` (gitignored; picked up by `demo/fixture.js` as `window.REAL_FIXTURE`), then `cd demo && python3 -m http.server 8000` and open http://localhost:8000.
+`demo/app.js` was minimally edited to take `years` / `windowTag` from the fixture; `demo/real-overrides.js` replaces the static verdict and marks exit rate n/c (comparison cohorts have no exit data).
 
 ## Method
 - Theme: Dealroom sector tag `taxonomy_id` 2282901 "financial inclusion", HQ Europe (`hq_location` 76). Sub-themes: keyword rules (`SUBS` in build_fixture.py), unreviewed.

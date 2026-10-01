@@ -57,7 +57,7 @@ def angle(r):
     s = [k.replace("_", " ") for k, _ in r["subs"].most_common(2)]
     return f"Already holds {len(r['gps'])} managers that backed {len(r['cos'])} European FI companies, mostly {' and '.join(s)}. Ask how it sees thematic exposure vs. generalist VC and whether a dedicated FI fund fits its allocation."
 fixture = {
-    "asOf": "Live Dealroom crawl " + __import__("datetime").date.today().isoformat(),
+    "asOf": __import__("datetime").date.today().isoformat(),
     "theme": {"id": "theme-fi", "label": "Financial inclusion (Europe)"},
     "companies": [company_out(c) for c in cs],
     "gps": [{"id": f"gp-{u[:8]}", "name": gp_name[u]} for u in sorted(top_gp_ids)],
@@ -105,6 +105,18 @@ def verdict(a):
     return f"{sep}; FI top-3 hold {round(f['top3ShareOfValue']*100)}% of valuation vs {round(t['top3ShareOfValue']*100)}% fintech and {round(v['top3ShareOfValue']*100)}% venture."
 att["verdict"] = verdict(att)
 fixture["attribution"] = att
+# --- fields the demo's real-data mode (demo/app.js, isReal) expects ---
+all_vc = [r for c in cs for r in c["rounds"] if r["is_vc"] is not False]
+fixture.update({
+    "realData": True, "geography": "Europe (HQ)", "years": list(range(2018, 2026)), "windowTag": "USD millions · 2018-2025",
+    "window": "Venture rounds to " + __import__("datetime").date.today().isoformat()[:7],
+    "coverage": {"transactions": len(all_vc), "lpsWithFiCompanyLinks": len(ranked)},
+    "taxonomy": {"financialInclusionSector": 2282901, "fintechIndustry": 126403},
+    "lpCoverage": "Institutional European LPs only (fund of funds, pension, sovereign wealth, family office, other: 394 screened). LP-to-GP links are Dealroom-recorded relationships with no commitment size, date or vintage. Top 25 shown.",
+    "graphCompanies": [c for c in fixture["companies"] if c["group"] == "fi" and c["gps"]],
+    "exitComparable": False,
+})
+fixture["verdictText"] = att.get("verdict", "")
 fixture["caveats"] = ["Comparison cohorts were sampled as VC-backed, launched 2012+, first 150 returned: not randomised; exits not comparable.", "HQ in Europe does not imply serving European customers.", "LP-GP links are known relationships without commitment size or date."]
 open(f"{D}/fixture.real.js", "w").write("// Generated from a live Dealroom crawl. Do not commit (data terms).\nwindow.DEMO_FIXTURE = " + json.dumps(fixture, indent=1) + ";\n")
 print("sub-themes:", dict(collections.Counter(c["sub"] for c in fi)))
