@@ -90,11 +90,40 @@
   function linkButton(id, label) {
     return '<button class="entity-link" type="button" data-node="' + esc(id) + '">' + esc(label) + '</button>';
   }
+  // Focused view: only the active path is shown, laid out in columns (theme | FI companies | investors | LP).
+  var ROW = 40;
+  function otherEnd(e, n) { return e.source().id() === n.id() ? e.target() : e.source(); }
+  function layoutFocused() {
+    var vis = cy.nodes().not(".hidden"), cols = [[], [], [], []], rank = {};
+    vis.forEach(function (n) { cols[n.hasClass("theme") ? 0 : n.hasClass("lp") ? 3 : n.hasClass("gp") ? 2 : 1].push(n); });
+    function label(n) { return String(n.data("label")).toLowerCase(); }
+    function reorder(col, byCol) {   // barycentre ordering to cut edge crossings
+      col.forEach(function (n) {
+        var s = 0, c = 0;
+        n.connectedEdges().not(".hidden").forEach(function (e) { var o = otherEnd(e, n); if (rank[o.id()] !== undefined && cols[byCol].indexOf(o) !== -1) { s += rank[o.id()]; c++; } });
+        n._m = c ? s / c : 1e9;
+      });
+      col.sort(function (a, b) { return a._m - b._m || label(a).localeCompare(label(b)); });
+      col.forEach(function (n, i) { rank[n.id()] = i; });
+    }
+    cols[2].sort(function (a, b) { return label(a).localeCompare(label(b)); }); cols[2].forEach(function (n, i) { rank[n.id()] = i; });
+    reorder(cols[1], 2); reorder(cols[2], 1); reorder(cols[1], 2); reorder(cols[3], 2);
+    var H = Math.max(6, Math.max.apply(null, cols.map(function (c) { return c.length; }))) * ROW, X = [0, 310, 610, 900];
+    cols.forEach(function (col, ci) { col.forEach(function (n, i) { n.position({ x: X[ci], y: (i + .5) * H / col.length }); }); });
+    var box = document.getElementById("cy"), z = Math.min(1, (box.clientWidth - 56) / 1060);
+    box.style.height = Math.max(300, Math.round(H * z) + 64) + "px";
+    cy.resize(); cy.fit(vis, 28);
+  }
   function markPath(nodes, edges) {
     if (!cy) return;
-    cy.elements().removeClass("faded path selected").addClass("faded");
-    nodes.forEach(function (id) { cy.getElementById(id).removeClass("faded").addClass("path"); });
-    edges.forEach(function (id) { cy.getElementById(id).removeClass("faded").addClass("path"); });
+    var keepN = {}, keepE = {};
+    nodes.forEach(function (id) { keepN[id] = true; }); edges.forEach(function (id) { keepE[id] = true; });
+    cy.batch(function () {
+      cy.elements().removeClass("faded path selected hl dim hidden");
+      cy.nodes().forEach(function (n) { if (keepN[n.id()]) n.addClass("path"); else n.addClass("hidden"); });
+      cy.edges().forEach(function (e) { if (keepE[e.id()] && !e.source().hasClass("hidden") && !e.target().hasClass("hidden")) e.addClass("path"); else e.addClass("hidden"); });
+    });
+    layoutFocused();
   }
   function addCompanyPath(company, nodes, edges) {
     nodes.push(company.id);
@@ -342,21 +371,29 @@
     }
     cy = window.cytoscape({ container: document.getElementById("cy"), elements: graphElements(), layout: { name: "preset", fit: true, padding: 35 }, minZoom: .45, maxZoom: 1.4,
       style: [
-        { selector: "node", style: { label: "data(label)", "text-wrap": "wrap", "text-max-width": "135px", "font-size": 11, "font-weight": 700, color: "#fff", "text-valign": "center", "text-halign": "center", width: 150, height: 39, shape: "round-rectangle", "border-width": 1, "border-color": "rgba(10,30,50,.14)" } },
+        { selector: "node", style: { label: "data(label)", "text-wrap": "wrap", "text-max-width": "140px", "font-size": 11, "font-weight": 700, color: "#fff", "text-valign": "center", "text-halign": "center", width: 150, height: 28, shape: "round-rectangle", "border-width": 1, "border-color": "rgba(10,30,50,.14)" } },
         { selector: "node.theme", style: { "background-color": "#7957d5", width: 112, height: 68, shape: "hexagon", "font-size": 12 } },
         { selector: "node.fi-company", style: { "background-color": "#1c9b78" } },
         { selector: "node.peer-company", style: { "background-color": "#3482bd", height: 32, "font-size": 10 } },
         { selector: "node.gp", style: { "background-color": "#d18c27", color: "#35250c" } },
         { selector: "node.lp", style: { "background-color": "#cf5a83" } },
         { selector: "edge", style: { width: 1.5, "line-color": "#b8c6d4", "target-arrow-color": "#b8c6d4", "target-arrow-shape": "triangle", "curve-style": "bezier", "arrow-scale": .75 } },
-        { selector: "edge.classification", style: { "line-color": "#7957d5", "target-arrow-color": "#7957d5", "line-style": "dashed" } },
-        { selector: "edge.path", style: { width: 3, "line-color": "#27a77e", "target-arrow-color": "#27a77e", "z-index": 10 } },
-        { selector: "node.faded, edge.faded", style: { opacity: .14 } },
+        { selector: "edge.classification", style: { "line-color": "#7957d5", "target-arrow-color": "#7957d5", "line-style": "dashed", width: 1, opacity: .3 } },
+        { selector: "edge.path", style: { width: 1.6, "line-color": "#27a77e", "target-arrow-color": "#27a77e", opacity: .55, "z-index": 10 } },
+        { selector: "edge.classification.path", style: { width: 1, opacity: .3, "line-color": "#7957d5", "target-arrow-color": "#7957d5" } },
+        { selector: ".hidden", style: { display: "none" } },
+        { selector: "edge.hl", style: { width: 3.2, opacity: 1, "z-index": 20 } },
+        { selector: "node.dim, edge.dim", style: { opacity: .18 } },
         { selector: "node.path", style: { "border-width": 3, "border-color": "#27a77e", "z-index": 10 } },
         { selector: "node.selected", style: { "border-width": 4, "border-color": "#14263c" } }
       ]
     });
     cy.on("tap", "node", function (event) { openNode(event.target.id()); });
+    cy.on("mouseover", "node", function (event) {
+      var n = event.target, keep = n.connectedEdges().not(".hidden");
+      cy.batch(function () { cy.elements().not(".hidden").addClass("dim"); keep.removeClass("dim").addClass("hl"); keep.connectedNodes().removeClass("dim"); n.removeClass("dim"); });
+    });
+    cy.on("mouseout", "node", function () { cy.elements().removeClass("dim hl"); });
   }
 
   document.querySelectorAll(".tab").forEach(function (button) {
