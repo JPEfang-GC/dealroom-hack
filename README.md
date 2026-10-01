@@ -63,3 +63,18 @@ source caveats and the recommended next history pull.
 
 To continue in a new chat: Read this README and the source-linked analysis in
 `consumer-demand-cycle.md`.
+
+## Hackathon demo: LP attribution and FI performance
+
+Open `demo/index.html` in a browser. The static demo uses Cytoscape.js and the
+fictional, self-contained data in `demo/fixture.js`. It includes the LP → GP →
+company network, a cohort comparison (funding progression, follow-on rate,
+valuation step-ups, exits and top-three concentration), and a ranked LP review
+screen with suggested investigation angles.
+
+**All names, portfolio links and figures in the demo are fictional.** The
+fixture is only for building and presenting the interaction flow. Replace it
+with a validated, licensed Dealroom query before presenting any results as fact.
+The FI category rule, European fintech definition, cohort overlap and LP-to-GP
+relationships must all be reviewed and documented first. LP portfolio links
+do not prove direct company ownership, amount invested or realized return.
