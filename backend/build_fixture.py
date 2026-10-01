@@ -3,7 +3,8 @@
 Run: python3 backend/build_fixture.py"""
 import json, os, re, statistics, collections, dr
 D = os.path.join(dr.ROOT, "data")
-TOP_LPS = 25
+TOP_LPS = 10**6   # every LP with an FI path, so the company-driven graph can reach all of them
+RANK_SHOWN = 25
 SUBS = [  # first match wins; keyword rules on tagline/about/tags
     ("remittances", r"remittance|cross-border (payment|transfer)|money transfer|send money|diaspora"),
     ("insurance", r"insur|micro.?insurance|insurtech"),
@@ -19,6 +20,11 @@ def classify(c):
         if re.search(rx, txt): return name
     return "other_fi"
 
+def vintage(c):
+    y = int(str(c["launch_date"])[:4]) if c["launch_date"] else 0
+    return 2012 <= y <= 2022
+SUB_LABEL = {"credit": "Consumer credit", "credit_underwriting": "Credit scoring & underwriting", "sme_finance": "SME finance", "financial_health": "Financial health & education",
+             "insurance": "Insurance", "remittances": "Remittances & cross-border", "inclusive_banking": "Inclusive banking & payments", "other_fi": "Other FI"}
 def mm(x): return round(x / 1e6, 2) if x else None
 def slug(s): return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
@@ -33,6 +39,7 @@ for c in fi:
         for i in r["investors"]: gp2co[i["uuid"]].add(c["uuid"]); gp_name[i["uuid"]] = i["name"]
 byid = {c["uuid"]: c for c in cs}
 
+gp_domain = {g["uuid"]: g.get("domain") for l in lps for g in l["gps"]}
 ranked = []
 for l in lps:
     gs = [g for g in l["gps"] if g["uuid"] in gp2co]
@@ -50,6 +57,7 @@ def rounds_out(c):
 def company_out(c):
     gps = sorted({f"gp-{i['uuid'][:8]}" for r in c["rounds"] for i in r["investors"] if i["uuid"] in top_gp_ids})
     o = {"id": c["uuid"][:8], "name": c["name"], "group": c["group"], "product": c["tagline"], "sub": c["sub"], "country": c["country"], "gps": gps, "rounds": rounds_out(c)}
+    if c["group"] == "fi" and not vintage(c): o["excludeFromStats"] = True
     if c["exit_date"]: o["exit"] = {"year": int(str(c["exit_date"])[:4]), "type": "exit"}
     return o
 
@@ -60,8 +68,8 @@ fixture = {
     "asOf": __import__("datetime").date.today().isoformat(),
     "theme": {"id": "theme-fi", "label": "Financial inclusion (Europe)"},
     "companies": [company_out(c) for c in cs],
-    "gps": [{"id": f"gp-{u[:8]}", "name": gp_name[u]} for u in sorted(top_gp_ids)],
-    "lps": [{"id": f"lp-{r['lp']['uuid'][:8]}", "name": r["lp"]["name"], "type": r["lp"]["type"].replace("_", " "),
+    "gps": [{"id": f"gp-{u[:8]}", "name": gp_name[u], "domain": gp_domain.get(u)} for u in sorted(top_gp_ids)],
+    "lps": [{"id": f"lp-{r['lp']['uuid'][:8]}", "name": r["lp"]["name"], "domain": r["lp"].get("domain"), "type": r["lp"]["type"].replace("_", " "),
              "gps": [f"gp-{g['uuid'][:8]}" for g in r["gps"]], "fiCompanies": len(r["cos"]), "subthemes": dict(r["subs"]), "angle": angle(r),
              "why": [{"gp": g["name"], "companies": sorted(byid[u]["name"] for u in gp2co[g["uuid"]])} for g in r["gps"]]} for r in top],
 }
@@ -117,6 +125,9 @@ fixture.update({
     "exitComparable": False,
 })
 fixture["verdictText"] = att.get("verdict", "")
+fi_v = [c for c in fi if vintage(c)]
+fixture["subthemes"] = [{"id": k, "label": SUB_LABEL[k], "companies": sum(1 for c in fi if c["sub"] == k)} for k in SUB_LABEL if any(c["sub"] == k for c in fi)]
+fixture["rankShown"] = RANK_SHOWN
 fixture["caveats"] = ["Comparison cohorts were sampled as VC-backed, launched 2012+, first 150 returned: not randomised; exits not comparable.", "HQ in Europe does not imply serving European customers.", "LP-GP links are known relationships without commitment size or date."]
 open(f"{D}/fixture.real.js", "w").write("// Generated from a live Dealroom crawl. Do not commit (data terms).\nwindow.DEMO_FIXTURE = " + json.dumps(fixture, indent=1) + ";\n")
 print("sub-themes:", dict(collections.Counter(c["sub"] for c in fi)))

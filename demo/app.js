@@ -18,6 +18,7 @@
   function percent(value) { return Math.round(value * 100) + "%"; }
   function byGroup(group) {
     return data.companies.filter(function (c) {
+      if (c.excludeFromStats) return false;
       return group === "fi" ? c.group === "fi" : group === "fintech" ? c.group !== "venture" : true;
     });
   }
@@ -114,17 +115,42 @@
     box.style.height = Math.max(300, Math.round(H * z) + 64) + "px";
     cy.resize(); cy.fit(vis, 28);
   }
+  var focusUI = window.focusUI = { sub: null, cap: 15, lpCap: 12, last: null, total: 0, shown: 0, lpTotal: 0, lpShown: 0 };
   function markPath(nodes, edges) {
     if (!cy) return;
+    focusUI.last = { nodes: nodes, edges: edges };
     var keepN = {}, keepE = {};
     nodes.forEach(function (id) { keepN[id] = true; }); edges.forEach(function (id) { keepE[id] = true; });
     cy.batch(function () {
       cy.elements().removeClass("faded path selected hl dim hidden");
       cy.nodes().forEach(function (n) { if (keepN[n.id()]) n.addClass("path"); else n.addClass("hidden"); });
+      // sub-theme filter, then keep the largest N companies (by latest valuation) unless "all" is chosen
+      var cos = cy.nodes(".fi-company").not(".hidden"), pool = focusUI.sub ? cos.filter(function (n) { return n.data("sub") === focusUI.sub; }) : cos;
+      cos.not(pool).addClass("hidden");
+      focusUI.total = pool.length;
+      if (focusUI.cap && pool.length > focusUI.cap) {
+        var ranked = pool.toArray().sort(function (a, b) { var ea = entities[a.id()], eb = entities[b.id()]; return (latestValue(eb) || 0) - (latestValue(ea) || 0); });
+        ranked.slice(focusUI.cap).forEach(function (n) { n.addClass("hidden"); });
+        pool = cy.collection(ranked.slice(0, focusUI.cap));
+      }
+      focusUI.shown = pool.length;
+      // LP cap: keep the LPs with the most visible investor links (ties: broader FI reach)
+      var lpsAll = cy.nodes(".lp").not(".hidden"); focusUI.lpTotal = lpsAll.length;
+      if (focusUI.lpCap && lpsAll.length > focusUI.lpCap) {
+        var rl = lpsAll.toArray().sort(function (a, b) { return b.connectedEdges().not(".hidden").length - a.connectedEdges().not(".hidden").length || ((entities[b.id()] || {}).fiCompanies || 0) - ((entities[a.id()] || {}).fiCompanies || 0); });
+        rl.slice(focusUI.lpCap).forEach(function (n) { n.addClass("hidden"); });
+      }
+      focusUI.lpShown = cy.nodes(".lp").not(".hidden").length;
       cy.edges().forEach(function (e) { if (keepE[e.id()] && !e.source().hasClass("hidden") && !e.target().hasClass("hidden")) e.addClass("path"); else e.addClass("hidden"); });
+      // investors with no visible company link are dropped; so is a theme node with nothing under it
+      cy.nodes(".gp").not(".hidden").forEach(function (g) { if (g.connectedEdges().not(".hidden").filter(function (e) { return e.source().hasClass("fi-company") || e.target().hasClass("fi-company"); }).length === 0 && cos.length) g.addClass("hidden"); });
+      cy.edges().forEach(function (e) { if (e.source().hasClass("hidden") || e.target().hasClass("hidden")) e.addClass("hidden"); });
+      cy.nodes(".lp").not(".hidden").forEach(function (l) { if (l.connectedEdges().not(".hidden").length === 0 && cos.length) l.addClass("hidden"); });
     });
     layoutFocused();
+    document.dispatchEvent(new CustomEvent("focus-updated"));
   }
+  window.focusRefresh = function () { if (focusUI.last) markPath(focusUI.last.nodes, focusUI.last.edges); };
   function addCompanyPath(company, nodes, edges) {
     nodes.push(company.id);
     if (company.group === "fi") {
@@ -317,7 +343,7 @@
         svg.push('<circle class="chart-point" data-group="' + cohort.id + '" data-year="' + s.years[j] + '" tabindex="0" role="button" aria-label="' + cohort.label + ' funding in ' + s.years[j] + ': ' + money(v) + '. Click to explore." cx="' + x(j) + '" cy="' + y(v) + '" r="5" fill="' + colors[cohort.id] + '"/><title>' + cohort.label + ' · ' + s.years[j] + ' · ' + money(v) + '</title>');
       });
     });
-    stats.fi.years.forEach(function (yr, i) { if (!isReal || i % 3 === 0 || i === stats.fi.years.length - 1) svg.push('<text x="' + x(i) + '" y="' + (height - 9) + '" text-anchor="middle" fill="#70839a" font-size="9">' + yr + '</text>'); });
+    stats.fi.years.forEach(function (yr, i) { if (!isReal || data.years || i % 3 === 0 || i === stats.fi.years.length - 1) svg.push('<text x="' + x(i) + '" y="' + (height - 9) + '" text-anchor="middle" fill="#70839a" font-size="9">' + yr + '</text>'); });
     svg.push('</svg>');
     document.getElementById("funding-chart").innerHTML = svg.join("");
     document.querySelectorAll(".chart-point").forEach(function (point) {
@@ -353,7 +379,7 @@
   function graphElements() {
     var elements = [{ data: { id: data.theme.id, label: data.theme.label }, position: { x: 90, y: 345 }, classes: "theme" }];
     (data.graphCompanies || data.companies).forEach(function (c, i) {
-      elements.push({ data: { id: c.id, label: c.name }, position: { x: 345, y: 42 + i * 46 }, classes: c.group === "fi" ? "fi-company" : "peer-company" });
+      elements.push({ data: { id: c.id, label: c.name, sub: c.sub || "" }, position: { x: 345, y: 42 + i * 46 }, classes: (c.group === "fi" ? "fi-company" : "peer-company") + (c.sub ? " sub-" + c.sub : "") });
       if (c.group === "fi") elements.push({ data: { id: "class-" + c.id, source: data.theme.id, target: c.id }, classes: "classification" });
       c.gps.forEach(function (gp) { elements.push({ data: { id: "portfolio-" + c.id + "-" + gp, source: c.id, target: gp }, classes: "portfolio" }); });
     });
@@ -374,6 +400,14 @@
         { selector: "node", style: { label: "data(label)", "text-wrap": "wrap", "text-max-width": "140px", "font-size": 11, "font-weight": 700, color: "#fff", "text-valign": "center", "text-halign": "center", width: 150, height: 28, shape: "round-rectangle", "border-width": 1, "border-color": "rgba(10,30,50,.14)" } },
         { selector: "node.theme", style: { "background-color": "#7957d5", width: 112, height: 68, shape: "hexagon", "font-size": 12 } },
         { selector: "node.fi-company", style: { "background-color": "#1c9b78" } },
+        { selector: "node.sub-credit", style: { "background-color": "#2f9e6e" } },
+        { selector: "node.sub-credit_underwriting", style: { "background-color": "#0e9aa7" } },
+        { selector: "node.sub-sme_finance", style: { "background-color": "#3b6fd4" } },
+        { selector: "node.sub-financial_health", style: { "background-color": "#8a9a2b" } },
+        { selector: "node.sub-insurance", style: { "background-color": "#64748b" } },
+        { selector: "node.sub-remittances", style: { "background-color": "#9c6644" } },
+        { selector: "node.sub-inclusive_banking", style: { "background-color": "#1e3a5f" } },
+        { selector: "node.sub-other_fi", style: { "background-color": "#94a3b8" } },
         { selector: "node.peer-company", style: { "background-color": "#3482bd", height: 32, "font-size": 10 } },
         { selector: "node.gp", style: { "background-color": "#d18c27", color: "#35250c" } },
         { selector: "node.lp", style: { "background-color": "#cf5a83" } },

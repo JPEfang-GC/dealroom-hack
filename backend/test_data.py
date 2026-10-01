@@ -60,6 +60,20 @@ if mc:
     check("Bank Rate in plausible range", all(0 <= o["value"] <= 10 for o in obs if o["metric"] == "bank_rate_pct"))
     check("Findex ownership between 0 and 100", all(0 <= o["value"] <= 100 for o in obs if o["metric"].startswith("findex")))
 
+# --- market share layer ---
+mk = fx.get("market"); check("market share layer present", bool(mk))
+if mk:
+    yrs = mk["years"]; f, e, ft = mk["funding_usd"]["fi"], mk["funding_usd"]["europe_vc"], mk["funding_usd"]["fintech"]
+    check("FI share = FI / Europe VC (arithmetic)", all(abs(mk["fi_share_of_europe_vc_pct"][i] - f[i] / e[i] * 100) < 0.01 for i in range(len(yrs))))
+    check("FI share of fintech = FI / fintech", all(abs(mk["fi_share_of_fintech_vc_pct"][i] - f[i] / ft[i] * 100) < 0.01 for i in range(len(yrs))))
+    check("FI never exceeds fintech or Europe VC", all(f[i] <= ft[i] * 1.01 and ft[i] <= e[i] for i in range(len(yrs))))
+    crawl25 = sum(r["amount"] or 0 for c in cs if c["group"] == "fi" for r in c["rounds"] if r["year"] == 2025 and r["is_vc"] is not False)
+    check("market FI 2025 within 10% of independent crawl", abs(f[yrs.index(2025)] - crawl25) / crawl25 < .10, f"{f[yrs.index(2025)]/1e6:.0f}m vs crawl {crawl25/1e6:.0f}m")
+    check("share values are percentages 0-100", all(0 < x < 100 for x in mk["fi_share_of_europe_vc_pct"] if x))
+check("stats scope: 44 FI companies outside 2012-2022 excluded", sum(1 for c in fx["companies"] if c.get("excludeFromStats")) == 44)
+check("all LPs with an FI path present", len(fx["lps"]) == 153, len(fx["lps"]))
+check("LPs and GPs carry domains for warm-path matching", sum(1 for l in fx["lps"] if l.get("domain")) / len(fx["lps"]) > .9 and sum(1 for g in fx["gps"] if g.get("domain")) / len(fx["gps"]) > .8, (sum(1 for l in fx["lps"] if l.get("domain")), sum(1 for g in fx["gps"] if g.get("domain"))))
+
 # --- LIVE spot check (bypasses cache): re-verify 3 LP -> GP -> company -> FI paths against the API ---
 random.seed(3); cache_off = dr.CACHE
 def live(path, **p):

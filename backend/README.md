@@ -11,6 +11,7 @@ python3 backend/test_data.py        # after build_fixture.py: 19 integrity check
 python3 backend/crawl_companies.py  # 394 EU Financial Inclusion cos + rounds + investors (~3 min)
 python3 backend/crawl_matched.py    # launch-year-matched fintech / venture comparison cohorts (~5 min)
 python3 backend/crawl_lps.py        # ~394 institutional EU LPs and the GPs each backs (~2 min)
+python3 backend/build_market.py      # market-level FI share of European VC / fintech VC (Dealroom analytics, default filters)
 python3 backend/build_fixture.py    # classify sub-themes, LP->GP->company paths, attribution -> data/fixture.real.js
 ```
 Standard library only. Responses are cached in `data/cache/`, so reruns are fast.
@@ -39,3 +40,10 @@ All sources are normalised to `{geography, date, metric, value, source}`: Dealro
 World Bank (GDP growth, unemployment, inflation, GDP per capita, Global Findex account ownership for GBR/USA/DEU/FRA), and the curated UK stress snapshot in `consumer_demand_signals.csv`.
 Capital gap = growth in StepChange need signals (Aug-26 vs Aug-25) minus growth in UK FI VC funding (2025 vs 2024): indicative only, periods differ.
 Not available: US consumer-stress series (FRED unreachable from the build machine), historical BoE credit series, other FCA Financial Lives indicators.
+
+## Interface modules (demo/, all optional layers over app.js; real-data mode only)
+- `insights.js`: "Is financial inclusion outperforming?" card with a toggle: share of funding (FI as % of European VC / fintech VC, market-level), follow-on rate by asset class (with 95% intervals), valuation increase by asset class.
+- `company-explorer.js`: company-driven network. Search/click a company and only its investors (GPs) and the LPs behind them load; sub-theme filter; top-N caps with "Show all".
+- `connections.js`: Warm paths. Connect Gmail (read-only `gmail.metadata`, From/To/Cc/Date only, processed in the browser, nothing stored) or use the labelled sample mailbox; scores each LP from contacts at the LP and at the GPs it backs. Needs your own Google OAuth client ID (setup steps are in the card). Not tested against a real mailbox.
+- `polish.js`: answer strip (thesis verdict derived from the data), wording cleanup. `macro-panel.js`, `real-overrides.js` as before.
+Run: `python3 backend/serve_demo.py` then open http://localhost:8000.

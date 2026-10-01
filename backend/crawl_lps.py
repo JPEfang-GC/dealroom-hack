@@ -14,7 +14,7 @@ if __name__ == "__main__":
     print("LPs", len(lps))
     for n, lp in enumerate(lps.values(), 1):
         rows = page_all(f"/data/investors/{lp['uuid']}/lp-funds", 1000)
-        lp["gps"] = [{"uuid": r["investor"]["uuid"], "name": r["investor"]["name"]} for r in rows]
+        lp["gps"] = [{"uuid": r["investor"]["uuid"], "name": r["investor"]["name"], "domain": r["investor"].get("domain")} for r in rows]
         if n % 50 == 0: print(f"{n}/{len(lps)}", flush=True)
     json.dump(list(lps.values()), open(OUT, "w"), indent=1)
     print("wrote", OUT, "LPs with holdings:", sum(1 for l in lps.values() if l["gps"]))
