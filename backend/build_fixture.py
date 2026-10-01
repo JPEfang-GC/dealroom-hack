@@ -67,19 +67,43 @@ fixture = {
 }
 
 # --- attribution (does FI add anything beyond fintech, or is it a few winners?) ---
-def stats(group):
-    x = [c for c in cs if c["group"] == group]
-    latest = lambda c: next((r["valuation"] for r in sorted(c["rounds"], key=lambda r: (r["year"] or 0, r["month"] or 0), reverse=True) if r["valuation"]), None)
-    steps = []
-    for c in x:
-        v = [r["valuation"] for r in sorted(c["rounds"], key=lambda r: (r["year"] or 0, r["month"] or 0)) if r["valuation"]]
-        if len(v) >= 2 and v[-2]: steps.append(v[-1] / v[-2])
+import random
+random.seed(11)
+def vintage_ok(c):
+    y = int(str(c["launch_date"])[:4]) if c["launch_date"] else 0
+    return 2012 <= y <= 2022
+def sorted_rounds(c): return sorted([r for r in c["rounds"] if r["is_vc"] is not False], key=lambda r: (r["year"] or 0, r["month"] or 0))
+def latest(c): return next((r["valuation"] for r in reversed(sorted_rounds(c)) if r["valuation"]), None)
+def step(c):
+    v = [r["valuation"] for r in sorted_rounds(c) if r["valuation"]]
+    return v[-1] / v[-2] if len(v) >= 2 and v[-2] else None
+def boot(vals, fn, n=2000):
+    if len(vals) < 5: return None
+    s = sorted(fn(random.choices(vals, k=len(vals))) for _ in range(n)); return [round(s[int(.025 * n)], 3), round(s[int(.975 * n)], 3)]
+def stats(x):
+    flags = [1 if len(sorted_rounds(c)) > 1 else 0 for c in x]
+    steps = [v for v in map(step, x) if v]
     vals = sorted([v for v in map(latest, x) if v], reverse=True)
-    return {"n": len(x), "followOn": round(sum(1 for c in x if len([r for r in c["rounds"] if r["is_vc"]]) > 1) / len(x), 3),
-            "medianStepUp": round(statistics.median(steps), 2) if steps else None, "withValuation": len(vals),
+    k = max(1, round(len(vals) * .1))
+    return {"n": len(x), "followOn": round(sum(flags) / len(x), 3), "followOnCI": boot(flags, lambda v: sum(v) / len(v)),
+            "medianStepUp": round(statistics.median(steps), 2) if steps else None,
+            "medianStepUpCI": boot(steps, statistics.median), "withValuation": len(vals),
             "top3ShareOfValue": round(sum(vals[:3]) / sum(vals), 3) if vals else None,
-            "medianValuationM": mm(statistics.median(vals)) if vals else None}
-att = {g: stats(g) for g in ("fi", "fintech", "venture")}
+            "top10pctShareOfValue": round(sum(vals[:k]) / sum(vals), 3) if vals else None,
+            "medianValuationM": mm(statistics.median(vals)) if vals else None,
+            "meanOverMedianValuation": round(statistics.mean(vals) / statistics.median(vals), 1) if vals else None}
+cohort = lambda g: [c for c in cs if c["group"] == g and vintage_ok(c)]
+att = {g: stats(cohort(g)) for g in ("fi", "fintech", "venture")}
+att["fi_by_subtheme"] = {sub: stats([c for c in cohort("fi") if c["sub"] == sub]) for sub in sorted({c["sub"] for c in fi})}
+# selection: share of FI value held by top 3 companies, and what FI looks like without them
+fi_c = [c for c in cohort("fi") if latest(c)]; top3 = sorted(fi_c, key=latest, reverse=True)[:3]
+att["fi_ex_top3"] = stats([c for c in cohort("fi") if c not in top3]); att["fi_top3_names"] = [c["name"] for c in top3]
+def verdict(a):
+    f, t, v = a["fi"], a["fintech"], a["venture"]
+    lo = lambda d: d["followOnCI"][0] if d["followOnCI"] else None; hi = lambda d: d["followOnCI"][1] if d["followOnCI"] else None
+    sep = "FI follow-on rate sits outside the fintech 95% CI" if (lo(f) > hi(t) or hi(f) < lo(t)) else "FI follow-on rate is not distinguishable from fintech"
+    return f"{sep}; FI top-3 hold {round(f['top3ShareOfValue']*100)}% of valuation vs {round(t['top3ShareOfValue']*100)}% fintech and {round(v['top3ShareOfValue']*100)}% venture."
+att["verdict"] = verdict(att)
 fixture["attribution"] = att
 fixture["caveats"] = ["Comparison cohorts were sampled as VC-backed, launched 2012+, first 150 returned: not randomised; exits not comparable.", "HQ in Europe does not imply serving European customers.", "LP-GP links are known relationships without commitment size or date."]
 open(f"{D}/fixture.real.js", "w").write("// Generated from a live Dealroom crawl. Do not commit (data terms).\nwindow.DEMO_FIXTURE = " + json.dumps(fixture, indent=1) + ";\n")
