@@ -1,0 +1,65 @@
+"""Data integrity + live spot-check tests. Run after build_fixture.py:  python3 backend/test_data.py"""
+import json, os, random, sys, collections
+sys.path.insert(0, os.path.dirname(__file__))
+import dr
+D = os.path.join(dr.ROOT, "data"); fails = []
+def check(name, ok, detail=""):
+    print(("PASS " if ok else "FAIL ") + name, detail)
+    if not ok: fails.append(name)
+
+cs = json.load(open(f"{D}/companies.json")); lps = json.load(open(f"{D}/lp_holdings.json"))
+t = open(f"{D}/fixture.real.js").read(); fx = json.loads(t[t.index("= ") + 2:].rstrip().rstrip(";"))
+cnt = collections.Counter(c["group"] for c in cs)
+
+# --- structure ---
+check("cohort sizes", cnt["fi"] == 394 and cnt["fintech"] == 350 and cnt["venture"] == 350, dict(cnt))
+check("no duplicate companies", len({c["uuid"] for c in cs}) == len(cs))
+check("fixture company ids unique", len({c["id"] for c in fx["companies"]}) == len(fx["companies"]))
+gp_ids = {g["id"] for g in fx["gps"]}; co_ids = {c["id"] for c in fx["companies"]}
+check("every company->GP edge resolves", all(g in gp_ids for c in fx["companies"] for g in c["gps"]))
+check("every LP->GP edge resolves", all(g in gp_ids for l in fx["lps"] for g in l["gps"]))
+check("every LP has >=1 GP and >=1 FI company", all(l["gps"] and l["fiCompanies"] > 0 for l in fx["lps"]))
+check("LPs ranked descending", [l["fiCompanies"] for l in fx["lps"]] == sorted((l["fiCompanies"] for l in fx["lps"]), reverse=True))
+check("every GP used by an LP", gp_ids == {g for l in fx["lps"] for g in l["gps"]})
+
+# --- internal consistency: LP's fiCompanies == unique FI companies reachable through its GPs ---
+fi_by_gp = collections.defaultdict(set)
+for c in fx["companies"]:
+    if c["group"] == "fi":
+        for g in c["gps"]: fi_by_gp[g].add(c["id"])
+bad = [l["name"] for l in fx["lps"] if len(set().union(*[fi_by_gp[g] for g in l["gps"]])) > l["fiCompanies"]]
+check("fixture edges never exceed LP's stated FI reach", not bad, bad[:3])
+check("'why' paths match GP lists", all(len(l["why"]) == len(l["gps"]) for l in fx["lps"]))
+
+# --- data quality ---
+fi = [c for c in cs if c["group"] == "fi"]
+check("FI cos have rounds (>=90%)", sum(1 for c in fi if c["rounds"]) / len(fi) >= .9, f"{sum(1 for c in fi if c['rounds'])}/{len(fi)}")
+check("FI cos are European", all(c["country"] for c in fi), collections.Counter(c["country"] for c in fi).most_common(3))
+check("sub-theme labels set for all FI", all(c["sub"] for c in fx["companies"] if c["group"] == "fi"))
+oth = sum(1 for c in fx["companies"] if c.get("sub") == "other_fi") / 394
+check("unclassified FI share < 20%", oth < .2, f"{oth:.0%}")
+yrs = [int(str(c["launch_date"])[:4]) for g in ("fintech", "venture") for c in cs if c["group"] == g and c["launch_date"]]
+check("comparison cohorts vintage-matched 2012-2022", min(yrs) >= 2012 and max(yrs) <= 2022, (min(yrs), max(yrs)))
+a = fx["attribution"]; check("attribution has CIs and verdict", all(a[g]["followOnCI"] for g in ("fi", "fintech", "venture")) and a["verdict"])
+check("amounts in $m are sane", all((r["amount"] or 0) < 20000 for c in fx["companies"] for r in c["rounds"]))
+check("no credentials in fixture", "client_secret" not in t.lower())
+
+# --- LIVE spot check (bypasses cache): re-verify 3 LP -> GP -> company -> FI paths against the API ---
+random.seed(3); cache_off = dr.CACHE
+def live(path, **p):
+    import hashlib, urllib.parse
+    q = urllib.parse.urlencode(p, safe="[]():,"); url = f"{dr.BASE}{path}" + (f"?{q}" if q else "")
+    f = os.path.join(cache_off, hashlib.md5(url.encode()).hexdigest() + ".json")
+    if os.path.exists(f): os.remove(f)
+    return dr.get(path, **p)
+FI_TAG = 2282901; byname = {c["name"]: c for c in cs}; ok_paths = 0
+for l in random.sample(fx["lps"], 3):
+    w = random.choice(l["why"]); co = random.choice(w["companies"]); lpu = next(x for x in lps if x["name"] == l["name"])
+    gpu = next(g["uuid"] for g in lpu["gps"] if g["name"] == w["gp"]); cu = byname[co]["uuid"]
+    holds = [r["investor"]["uuid"] for r in live(f"/data/investors/{lpu['uuid']}/lp-funds", limit=200)["data"]]
+    inv = [r["investor"]["uuid"] for rd in live(f"/data/companies/{cu}/funding-rounds", limit=100)["data"] for r in rd["investors"]]
+    tagged = FI_TAG in {x["id"] for x in live(f"/data/companies/{cu}")["data"]["taxonomy"]}
+    good = gpu in holds and gpu in inv and tagged
+    ok_paths += good; print(f"  live {l['name']} -> {w['gp']} -> {co}: LP holds GP={gpu in holds}, GP invested={gpu in inv}, FI-tagged={tagged}")
+check("3/3 sampled paths re-verified live", ok_paths == 3, f"{ok_paths}/3")
+print(f"\n{len(fails)} failed" if fails else "\nALL PASSED"); sys.exit(1 if fails else 0)

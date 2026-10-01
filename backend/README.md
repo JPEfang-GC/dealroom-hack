@@ -6,6 +6,7 @@ Each person uses their OWN key; Dealroom data and `.env` are never committed (`d
 ```bash
 cp <your>.env .env                  # DEALROOM_CLIENT_ID / DEALROOM_CLIENT_SECRET
 python3 backend/smoke_test.py       # 5 PASS lines = key + every hop works
+python3 backend/test_data.py        # after build_fixture.py: 19 integrity checks + 3 live path re-verifications
 python3 backend/crawl_companies.py  # 394 EU Financial Inclusion cos + rounds + investors (~3 min)
 python3 backend/crawl_matched.py    # launch-year-matched fintech / venture comparison cohorts (~5 min)
 python3 backend/crawl_lps.py        # ~394 institutional EU LPs and the GPs each backs (~2 min)
