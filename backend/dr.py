@@ -6,11 +6,12 @@ BASE = "https://api.beta.dealroom.app"
 
 def _env():
     e = {}
+    if not os.path.exists(os.path.join(ROOT, ".env")): return e      # synthetic builds need no API key
     for l in open(os.path.join(ROOT, ".env")):
         if "=" in l and not l.startswith("#"):
             k, v = l.strip().split("=", 1); e[k] = v
     return e
-ENV = _env(); CID = ENV["DEALROOM_CLIENT_ID"]
+ENV = _env(); CID = ENV.get("DEALROOM_CLIENT_ID", "")
 _tok = {"v": None}; _last = [0.0]
 
 def token():

@@ -17,3 +17,6 @@ venv/
 data/cache/
 data/
 dist/
+dist-real/
+.synthetic/
+demo/synthetic-fixture.js

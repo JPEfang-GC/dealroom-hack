@@ -2,7 +2,7 @@
 (same shape as demo/fixture.js DEMO_FIXTURE, plus extra fields: sub, why, attribution).
 Run: python3 backend/build_fixture.py"""
 import json, os, re, statistics, collections, dr
-D = os.path.join(dr.ROOT, "data")
+D = os.environ.get("DR_DATA_DIR") or os.path.join(dr.ROOT, "data")   # DR_DATA_DIR: synthetic runs read/write elsewhere
 TOP_LPS = 10**6   # every LP with an FI path, so the company-driven graph can reach all of them
 RANK_SHOWN = 25
 SUBS = [  # first match wins; keyword rules on tagline/about/tags

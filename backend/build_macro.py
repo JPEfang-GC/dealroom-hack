@@ -3,7 +3,9 @@ Sources: Dealroom (live, from crawl), Bank Rate (BoE IADB, live), World Bank (da
 UK consumer-stress signals (consumer_demand_signals.csv: StepChange / BoE / UK Finance / FCA, curated static).
 Run after build_fixture.py:  python3 backend/build_macro.py   -> data/macro.json and merges `macro` into data/fixture.real.js"""
 import csv, json, os, collections, urllib.request, dr
-D = os.path.join(dr.ROOT, "data")
+D = os.environ.get("DR_DATA_DIR") or os.path.join(dr.ROOT, "data")
+SYN = bool(os.environ.get("DR_SYNTHETIC"))                       # synthetic run: no network, no Dealroom data, labelled "Synthetic"
+SRC = lambda name: "Synthetic" if SYN else name
 M = []
 def add(geo, date, metric, value, source, **extra):
     if value is not None: M.append(dict(geography=geo, date=str(date), metric=metric, value=value, source=source, **extra))
@@ -20,22 +22,27 @@ for geo, pick in (("EUR", lambda c: True), ("GBR", lambda c: c["country"] == "Un
             funding[r["year"]] += r["amount"] or 0; rounds[r["year"]] += 1
             for i in r["investors"]: gps[r["year"]].add(i["uuid"])
     for y in range(2015, 2027):
-        add(geo, y, "fi_vc_funding_usd", funding[y], "Dealroom"); add(geo, y, "fi_funding_rounds", rounds[y], "Dealroom")
-        add(geo, y, "fi_active_investors", len(gps[y]), "Dealroom"); add(geo, y, "fi_company_formation", formed[y], "Dealroom")
+        add(geo, y, "fi_vc_funding_usd", funding[y], SRC("Dealroom")); add(geo, y, "fi_funding_rounds", rounds[y], SRC("Dealroom"))
+        add(geo, y, "fi_active_investors", len(gps[y]), SRC("Dealroom")); add(geo, y, "fi_company_formation", formed[y], SRC("Dealroom"))
 
-# 2) Bank of England Bank Rate (live, monthly -> year-end value)
-try:
-    u = "https://www.bankofengland.co.uk/boeapps/iadb/fromshowcolumns.asp?csv.x=yes&Datefrom=01/Jan/2015&Dateto=now&SeriesCodes=IUDBEDR&CSVF=TN&UsingCodes=Y&VPD=Y&VFD=N"
-    rows = list(csv.reader(urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"}), timeout=30).read().decode().splitlines()))[1:]
-    last = {}
-    for d, v in rows: last[d[-4:]] = (d, float(v))
-    for y, (d, v) in last.items(): add("GBR", y, "bank_rate_pct", v, "Bank of England", observed=d)
+# 2) Bank of England Bank Rate (live, monthly -> year-end value); synthetic runs read a synthetic series instead
+if SYN:
+    for y, v in json.load(open(os.path.join(D, "bankrate.json"))): add("GBR", y, "bank_rate_pct", v, "Synthetic")
     boe_ok = True
-except Exception as e: boe_ok = False; print("BoE failed:", e)
+else:
+    try:
+        u = "https://www.bankofengland.co.uk/boeapps/iadb/fromshowcolumns.asp?csv.x=yes&Datefrom=01/Jan/2015&Dateto=now&SeriesCodes=IUDBEDR&CSVF=TN&UsingCodes=Y&VPD=Y&VFD=N"
+        rows = list(csv.reader(urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"}), timeout=30).read().decode().splitlines()))[1:]
+        last = {}
+        for d, v in rows: last[d[-4:]] = (d, float(v))
+        for y, (d, v) in last.items(): add("GBR", y, "bank_rate_pct", v, "Bank of England", observed=d)
+        boe_ok = True
+    except Exception as e: boe_ok = False; print("BoE failed:", e)
+
 
 # 3) World Bank (pulled live via browser; stored as data/worldbank.json)
 wb = os.path.join(D, "worldbank.json")
-if not os.path.exists(wb):   # no cached pull: use the team's connector (macro_sources.fetch_world_bank); fails soft if the API is unreachable
+if not os.path.exists(wb) and not SYN:   # no cached pull: use the team's connector (macro_sources.fetch_world_bank); fails soft if the API is unreachable
     try:
         import sys; sys.path.insert(0, dr.ROOT); import macro_sources as ms
         rows = ms.fetch_world_bank(["GBR", "USA", "DEU", "FRA"], 2011, 2025)
@@ -43,10 +50,10 @@ if not os.path.exists(wb):   # no cached pull: use the team's connector (macro_s
     except Exception as e: print("World Bank fetch failed:", str(e)[:100])
 wb_ok = os.path.exists(wb)
 if wb_ok:
-    for geo, y, name, v in json.load(open(wb))["rows"]: add(geo, y, name, v, "World Bank")
+    for geo, y, name, v in json.load(open(wb))["rows"]: add(geo, y, name, v, SRC("World Bank"))
 
 # 4) UK consumer stress snapshot (curated static; partner's CSV)
-sig = os.path.join(dr.ROOT, "consumer_demand_signals.csv")
+sig = os.path.join(D, "consumer_demand_signals.csv") if SYN else os.path.join(dr.ROOT, "consumer_demand_signals.csv")
 for r in csv.DictReader(open(sig, encoding="utf-8-sig")):
     cmp = float(r["comparison_value"]) if r["comparison_value"].replace(".", "", 1).isdigit() else None
     add(r["country"], r["period"], r["metric"], float(r["value"]), r["source"], comparison_period=r["comparison_period"] or None, comparison_value=cmp, unit=r["unit"], role=r["signal_role"])
@@ -55,9 +62,9 @@ for r in csv.DictReader(open(sig, encoding="utf-8-sig")):
 ms = os.path.join(D, "market_share.json"); market = json.load(open(ms)) if os.path.exists(ms) else None
 if market:
     for i, y in enumerate(market["years"]):
-        add("EUR", y, "fi_vc_funding_market_usd", market["funding_usd"]["fi"][i], "Dealroom analytics"); add("EUR", y, "europe_vc_funding_usd", market["funding_usd"]["europe_vc"][i], "Dealroom analytics")
-        add("EUR", y, "fintech_vc_funding_usd", market["funding_usd"]["fintech"][i], "Dealroom analytics")
-        add("EUR", y, "fi_share_of_europe_vc_pct", market["fi_share_of_europe_vc_pct"][i], "Dealroom analytics"); add("EUR", y, "fi_share_of_fintech_vc_pct", market["fi_share_of_fintech_vc_pct"][i], "Dealroom analytics")
+        add("EUR", y, "fi_vc_funding_market_usd", market["funding_usd"]["fi"][i], SRC("Dealroom analytics")); add("EUR", y, "europe_vc_funding_usd", market["funding_usd"]["europe_vc"][i], SRC("Dealroom analytics"))
+        add("EUR", y, "fintech_vc_funding_usd", market["funding_usd"]["fintech"][i], SRC("Dealroom analytics"))
+        add("EUR", y, "fi_share_of_europe_vc_pct", market["fi_share_of_europe_vc_pct"][i], SRC("Dealroom analytics")); add("EUR", y, "fi_share_of_fintech_vc_pct", market["fi_share_of_fintech_vc_pct"][i], SRC("Dealroom analytics"))
 
 # 5) Capital gap (indicative): growth in underlying need vs growth in FI capital supply
 def S(geo, metric, date): return next((m["value"] for m in M if m["geography"] == geo and m["metric"] == metric and m["date"] == str(date)), None)
@@ -84,10 +91,19 @@ caveats = ["Capital gap compares periods that differ (Aug-26 vs Aug-25 stress; 2
            "Dealroom funding is the sum of venture rounds in the crawled FI cohort (hq Europe/UK); Dealroom's Mature and Outside-Tech default filters could not be applied at company level.",
            "Only the August 2026 StepChange / BoE / UK Finance snapshot is loaded; historical series and other FCA Financial Lives indicators are not yet extracted.",
            "2026 funding is a partial year, and the latest full year (2025) is probably still under-reported in Dealroom (late-added rounds), which biases supply growth down and the gap up."]
+if SYN:
+    sources = {"All series": "SYNTHETIC: generated by backend/make_synthetic.py. Fictional companies, funds and figures; no Dealroom, Bank of England, World Bank or StepChange data."}
+    caveats = ["Everything on this page is synthetic and illustrative. Companies, investors, LPs and every number are invented by a script; conclusions drawn from them are meaningless.",
+               "The real-data version of this tool (Dealroom API, Bank of England, World Bank, StepChange) runs locally and is not published because the data terms forbid redistribution."]
 fx_market = market
 macro = {"schema": "geography,date,metric,value,source", "sources": sources, "capitalGap": gap, "caveats": caveats, "observations": M}
 json.dump(macro, open(f"{D}/macro.json", "w"), indent=1)
 fp = f"{D}/fixture.real.js"; t = open(fp).read(); fx = json.loads(t[t.index("= ") + 2:].rstrip().rstrip(";")); fx["macro"] = macro; fx["market"] = market
 open(fp, "w").write("// Generated from a live Dealroom crawl. Do not commit (data terms).\nwindow.DEMO_FIXTURE = " + json.dumps(fx, indent=1) + ";\n")
+if SYN:
+    fx.update({"synthetic": True, "realData": False, "asOf": "synthetic", "geography": "Synthetic Europe", "window": "Synthetic venture rounds",
+               "lpCoverage": "Synthetic LPs and links (no real relationships)."})
+    open(os.path.join(dr.ROOT, "demo", "synthetic-fixture.js"), "w").write("// SYNTHETIC illustrative data: fictional companies, funds and numbers. Generated by backend/make_synthetic.py. Contains no Dealroom data.\nwindow.SYNTH_FIXTURE = " + json.dumps(fx) + ";\n")
+    print("wrote demo/synthetic-fixture.js", len(M), "observations"); raise SystemExit(0)
 open(os.path.join(dr.ROOT, "demo", "real-fixture.local.js"), "w").write("// Local Dealroom snapshot (gitignored; data terms). Generated by backend/build_macro.py\nwindow.REAL_FIXTURE = " + json.dumps(fx) + ";\n")
 print(len(M), "observations;", json.dumps(sources, indent=1)); print(json.dumps(gap, indent=1))

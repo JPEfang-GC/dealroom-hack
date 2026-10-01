@@ -307,7 +307,7 @@
 
   function applyRealLabels() {
     if (!isReal) return;
-    document.querySelector(".fixture").textContent = "Dealroom data · local snapshot";
+    document.querySelector(".fixture").textContent = "Dealroom data · hackathon snapshot";
     document.querySelector(".stamp").textContent = data.window + " · " + data.coverage.transactions.toLocaleString() + " VC rounds · retrieved " + data.asOf;
     document.querySelector(".intro p").textContent = "Explore Dealroom companies in the Financial Inclusion sector and compare their recorded venture funding signals with European fintech and European VC.";
     document.querySelector(".network-grid h2").textContent = "Financial Inclusion → companies → round investors";
