@@ -1,0 +1,8 @@
+{
+  // Cloudflare Workers (static assets): serves the demo/ folder. Worker name must match the Worker in the dashboard.
+  "name": "dealroom-hack",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./demo"
+  }
+}

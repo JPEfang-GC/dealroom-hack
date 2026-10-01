@@ -1,0 +1,5 @@
+# never upload Dealroom data or tooling files to the public site (key terms forbid publishing the data)
+real-fixture.local.js
+*.py
+*.local.*
+.assetsignore
