@@ -4,6 +4,8 @@
 *.zip
 SETUP.txt
 dealroom-api-analysis.md
+real-data/
+demo/real-fixture.local.js
 
 # Python and local environment artifacts.
 __pycache__/
