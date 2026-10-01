@@ -20,3 +20,4 @@ dist/
 dist-real/
 .synthetic/
 demo/synthetic-fixture.js
+.wrangler/
