@@ -47,3 +47,8 @@ Not available: US consumer-stress series (FRED unreachable from the build machin
 - `connections.js`: Warm paths. Connect Gmail (read-only `gmail.metadata`, From/To/Cc/Date only, processed in the browser, nothing stored) or use the labelled sample mailbox; scores each LP from contacts at the LP and at the GPs it backs. Needs your own Google OAuth client ID (setup steps are in the card). Not tested against a real mailbox.
 - `polish.js`: answer strip (thesis verdict derived from the data), wording cleanup. `macro-panel.js`, `real-overrides.js` as before.
 Run: `python3 backend/serve_demo.py` then open http://localhost:8000.
+
+## Deploying (Cloudflare Pages)
+`python3 backend/make_dist.py` builds `dist/` (code + synthetic fixture only; it verifies no Dealroom data or credentials are inside). Do NOT deploy `demo/real-fixture.local.js`: the key terms forbid publishing or redistributing Dealroom data.
+Dashboard route (no install): Cloudflare > Workers & Pages > Create > Pages > Upload assets > drag the `dist` folder.
+CLI route: `brew install node && npx wrangler login && npx wrangler pages deploy dist --project-name=inclusive-alpha`.

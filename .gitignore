@@ -16,3 +16,4 @@ venv/
 # Crawl cache (API responses; terms forbid redistributing data)
 data/cache/
 data/
+dist/
