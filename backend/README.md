@@ -6,6 +6,7 @@ Each person uses their OWN key; Dealroom data and `.env` are never committed (`d
 ```bash
 cp <your>.env .env                  # DEALROOM_CLIENT_ID / DEALROOM_CLIENT_SECRET
 python3 backend/smoke_test.py       # 5 PASS lines = key + every hop works
+python3 backend/build_macro.py       # market-need layer: Dealroom supply + BoE Bank Rate + World Bank + UK stress snapshot -> data/macro.json, merged into fixture
 python3 backend/test_data.py        # after build_fixture.py: 19 integrity checks + 3 live path re-verifications
 python3 backend/crawl_companies.py  # 394 EU Financial Inclusion cos + rounds + investors (~3 min)
 python3 backend/crawl_matched.py    # launch-year-matched fintech / venture comparison cohorts (~5 min)
@@ -30,3 +31,10 @@ To preview: copy `demo/` somewhere, replace `fixture.js` with `data/fixture.real
 - Exit rates are NOT comparable: comparison cohorts were sampled VC-backed and carry no exit data. Don't claim an exit-rate result.
 - LP-GP links carry no commitment size/date. "Indirect exposure" = paths, not ownership.
 - demo/index.html still says "fictional fixture" and its readout text is static; change both before presenting real data.
+
+## Macro / market-need panel (`demo/macro-panel.js`)
+Adds a "4 · Market need" tab; self-contained (reads `DEMO_FIXTURE.macro`, does not touch `app.js`; one `<script>` line in `demo/index.html`).
+All sources are normalised to `{geography, date, metric, value, source}`: Dealroom FI funding / rounds / active investors / company formation (UK and Europe), Bank of England Bank Rate (live, IADB CSV),
+World Bank (GDP growth, unemployment, inflation, GDP per capita, Global Findex account ownership for GBR/USA/DEU/FRA), and the curated UK stress snapshot in `consumer_demand_signals.csv`.
+Capital gap = growth in StepChange need signals (Aug-26 vs Aug-25) minus growth in UK FI VC funding (2025 vs 2024): indicative only, periods differ.
+Not available: US consumer-stress series (FRED unreachable from the build machine), historical BoE credit series, other FCA Financial Lives indicators.

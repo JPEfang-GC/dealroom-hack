@@ -44,6 +44,22 @@ a = fx["attribution"]; check("attribution has CIs and verdict", all(a[g]["follow
 check("amounts in $m are sane", all((r["amount"] or 0) < 20000 for c in fx["companies"] for r in c["rounds"]))
 check("no credentials in fixture", "client_secret" not in t.lower())
 
+
+# --- macro layer ---
+mc = fx.get("macro"); check("macro layer present", bool(mc))
+if mc:
+    obs = mc["observations"]
+    check("macro rows follow one schema", all({"geography", "date", "metric", "value", "source"} <= set(o) for o in obs))
+    check("macro values numeric", all(isinstance(o["value"], (int, float)) for o in obs))
+    srcs = {o["source"] for o in obs}; check("macro has Dealroom + BoE + World Bank + static snapshot", {"Dealroom", "Bank of England", "World Bank", "stepchange"} <= srcs, sorted(srcs))
+    uk = {o["date"]: o["value"] for o in obs if o["geography"] == "GBR" and o["metric"] == "fi_vc_funding_usd"}
+    uk_direct = sum(r["amount"] or 0 for c in cs if c["group"] == "fi" and c["country"] == "United Kingdom" for r in c["rounds"] if r["year"] == 2024 and r["is_vc"] is not False)
+    check("UK FI funding 2024 matches raw crawl", abs(uk["2024"] - uk_direct) < 1, f"{uk['2024']/1e6:.0f}m")
+    check("no duplicate macro keys", len({(o["geography"], o["date"], o["metric"], o["source"]) for o in obs if o["source"] != "stepchange" and o["source"] != "bank_of_england"}) == len([o for o in obs if o["source"] not in ("stepchange", "bank_of_england")]))
+    g = mc["capitalGap"]; check("capital gap arithmetic", abs(g["capital_gap_pp"] - (g["demand_growth_pct"] - g["supply_growth_pct"])) < 0.11, g["capital_gap_pp"])
+    check("Bank Rate in plausible range", all(0 <= o["value"] <= 10 for o in obs if o["metric"] == "bank_rate_pct"))
+    check("Findex ownership between 0 and 100", all(0 <= o["value"] <= 100 for o in obs if o["metric"].startswith("findex")))
+
 # --- LIVE spot check (bypasses cache): re-verify 3 LP -> GP -> company -> FI paths against the API ---
 random.seed(3); cache_off = dr.CACHE
 def live(path, **p):
