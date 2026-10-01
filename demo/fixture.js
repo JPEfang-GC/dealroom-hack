@@ -1,5 +1,7 @@
-// Entirely fictional data for UI and analytics prototyping.
-// Replace with a reviewed Dealroom export before presenting factual results.
+// Public fallback is synthetic. A local ignored Dealroom fixture overrides it.
+if (window.REAL_FIXTURE) {
+  window.DEMO_FIXTURE = window.REAL_FIXTURE;
+} else {
 window.DEMO_FIXTURE = {
   asOf: "Illustrative fixture",
   theme: { id: "theme-fi", label: "Financial inclusion" },
@@ -31,3 +33,4 @@ window.DEMO_FIXTURE = {
     {id:"lp-harbor", name:"Harbor Community Trust", type:"Endowment", gps:["gp-civic"], angle:"Discuss how it evaluates inclusion themes inside a broad venture portfolio."}
   ]
 };
+}

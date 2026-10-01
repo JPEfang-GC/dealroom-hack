@@ -66,15 +66,26 @@ To continue in a new chat: Read this README and the source-linked analysis in
 
 ## Hackathon demo: LP attribution and FI performance
 
-Open `demo/index.html` in a browser. The static demo uses Cytoscape.js and the
-fictional, self-contained data in `demo/fixture.js`. It includes the LP → GP →
-company network, a cohort comparison (funding progression, follow-on rate,
-valuation step-ups, exits and top-three concentration), and a ranked LP review
-screen with suggested investigation angles.
+Open demo/index.html in a browser. The public repo contains synthetic fallback
+data only. Generate a local Dealroom snapshot with PowerShell:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\fetch_real_data.ps1
 
-**All names, portfolio links and figures in the demo are fictional.** The
-fixture is only for building and presenting the interaction flow. Replace it
-with a validated, licensed Dealroom query before presenting any results as fact.
-The FI category rule, European fintech definition, cohort overlap and LP-to-GP
-relationships must all be reviewed and documented first. LP portfolio links
-do not prove direct company ownership, amount invested or realized return.
+This reads .env, retrieves Europe HQ VC rounds from April 2025 through
+September 2026, classifies companies using Dealroom Financial Inclusion sector
+ID 2282901 and Fintech industry ID 126403, then queries exit flags and known
+LP-to-investor links. The generated real-data/transactions-normalized.json and
+demo/real-fixture.local.js files are git-ignored. Do not commit or publish them.
+The demo loads the local snapshot when present and otherwise uses the public
+synthetic fallback.
+
+Round amounts are normalized to USD millions. Cohorts overlap: FI is included
+in Fintech and both are included in VC overall. The clickable graph displays
+a readable company and round-investor sample; cohort analytics use the full
+local extract. Known LP candidates are limited to investor entities in the
+shown graph. The API relationship points to an investor firm, not a specific
+fund vehicle or vintage, and the LP-to-manager path is not proof of a specific
+fund commitment to a particular company. Funding, valuation and exit fields
+are database signals, not realized LP returns or manual impact assessments.
+
+Both the .env file and returned Dealroom records remain local; only extractor
+code, classification rules and methodology belong in this public repository.
