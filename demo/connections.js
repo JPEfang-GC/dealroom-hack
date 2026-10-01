@@ -70,15 +70,19 @@
   /* ---------- sample mailbox (synthetic, labelled) ---------- */
   function sampleMessages() {
     var out = [], now = Date.now(), day = 86400000, ranked = d.lps.slice(0, 25);
+    var mk = function (dom, name) { return '"' + name + '" <' + name.toLowerCase().replace(/\W+/g, ".") + "@" + dom + ">"; };
     function add(dom, name, sent, recv, lastDays) {
-      for (var i = 0; i < sent; i++) out.push({ dir: "sent", to: '"' + name + '" <' + name.toLowerCase().replace(/\W+/g, ".") + "@" + dom + ">", date: new Date(now - (lastDays + i * 23) * day).toUTCString() });
-      for (var j = 0; j < recv; j++) out.push({ dir: "recv", from: '"' + name + '" <' + name.toLowerCase().replace(/\W+/g, ".") + "@" + dom + ">", date: new Date(now - (lastDays + j * 31) * day).toUTCString() });
+      for (var i = 0; i < sent; i++) out.push({ dir: "sent", to: mk(dom, name), date: new Date(now - (lastDays + i * 23) * day).toUTCString() });
+      for (var j = 0; j < recv; j++) out.push({ dir: "recv", from: mk(dom, name), date: new Date(now - (lastDays + j * 31) * day).toUTCString() });
     }
-    if (ranked[0] && ranked[0].domain) add(ranked[0].domain, "Alex Sample", 9, 7, 12);
-    if (ranked[2] && ranked[2].domain) add(ranked[2].domain, "Sam Sample", 2, 0, 240);
-    var gps = d.gps.filter(function (g) { return g.domain; });
-    [[0, "Jordan Sample", 14, 11, 4], [3, "Riley Sample", 5, 3, 60], [7, "Casey Sample", 3, 1, 150], [12, "Morgan Sample", 1, 1, 400]].forEach(function (p) { if (gps[p[0]]) add(gps[p[0]].domain, p[1], p[2], p[3], p[4]); });
+    // direct contacts at LPs (strong / medium / weak)
+    [[0, "Alex Sample", 9, 7, 12], [1, "Priya Sample", 4, 2, 70], [3, "Sam Sample", 2, 0, 240], [5, "Lena Sample", 6, 4, 25]].forEach(function (p) { if (ranked[p[0]] && ranked[p[0]].domain) add(ranked[p[0]].domain, p[1], p[2], p[3], p[4]); });
+    // contacts at GPs that many LPs back: these create warm intro paths to several LPs at once
+    var backers = {}; d.lps.forEach(function (l) { l.gps.forEach(function (g) { backers[g] = (backers[g] || 0) + 1; }); });
+    var gps = d.gps.filter(function (g) { return g.domain; }).sort(function (a, b) { return (backers[b.id] || 0) - (backers[a.id] || 0); });
+    [["Jordan Sample", 14, 11, 4], ["Riley Sample", 5, 3, 60], ["Casey Sample", 3, 1, 150], ["Morgan Sample", 1, 1, 400], ["Taylor Sample", 7, 6, 20]].forEach(function (p, i) { if (gps[i]) add(gps[i].domain, p[0], p[1], p[2], p[3]); });
     out.push({ dir: "sent", to: "newsletter@example.com", date: new Date().toUTCString() });
+    out.push({ dir: "recv", from: "noreply@example.com", date: new Date().toUTCString() });
     return out;
   }
 

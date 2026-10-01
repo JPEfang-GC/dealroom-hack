@@ -34,4 +34,16 @@
   document.querySelectorAll("#metric-table .small.muted").forEach(function (e) { e.textContent = "inspect"; });
   var cc = document.querySelector("#analysis .analysis-grid .card-head .small"); if (cc) cc.textContent = "Nested cohorts: FI ⊂ fintech ⊂ VC";
   var lh = document.querySelector("#prospects .card-head h2"); if (lh && /LP links/.test(lh.textContent)) lh.textContent = "Top LPs to investigate";
+
+  /* LP table: collapse long investor chip lists so rows are scannable */
+  var tcss = document.createElement("style");
+  tcss.textContent = "#lp-table td details{display:inline}#lp-table td details summary{display:inline-block;cursor:pointer;font-size:12px;font-weight:700;color:#4b2fa0;padding:4px 7px;list-style:none}#lp-table td details summary::-webkit-details-marker{display:none}#lp-table td details[open] summary{display:block;margin-top:2px}";
+  document.head.appendChild(tcss);
+  document.querySelectorAll("#lp-table tbody tr").forEach(function (row) {
+    var cell = row.cells[2]; if (!cell) return;
+    var chips = Array.prototype.slice.call(cell.querySelectorAll("button.entity-link")); if (chips.length <= 3) return;
+    var det = document.createElement("details"), sum = document.createElement("summary"); sum.textContent = "+" + (chips.length - 3) + " more";
+    det.appendChild(sum); chips.slice(3).forEach(function (c) { det.appendChild(c); }); cell.appendChild(det);
+    det.addEventListener("click", function (e) { e.stopPropagation(); });
+  });
 })();
